@@ -25,6 +25,9 @@ db.init_app(app)
 migrate = Migrate(app, db)
 api = Api(app)
 
+
+
+
 # Authentication and User Management
 class Signup(Resource):
     def post(self):
