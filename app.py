@@ -1,32 +1,21 @@
-#!/usr/bin/env python3
-
-# Standard library imports
-from datetime import datetime
-import os
-
-# Flask imports
 from flask import Flask, request, session, jsonify
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from flask_cors import CORS
-
-# Database and model imports
 from config import db
 from models import User, Doctor, Appointment, Prescription
+from datetime import datetime 
 
-# Setup Flask app
+
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your_secret_key'  # Replace with a real secret key
+app.config['SECRET_KEY'] = 'your_secret_key'
 
 db.init_app(app)
 migrate = Migrate(app, db)
 api = Api(app)
-
-
-
 
 # Authentication and User Management
 class Signup(Resource):
@@ -53,18 +42,33 @@ class Login(Resource):
             return user.to_dict(), 200
         return {'error': 'Invalid credentials'}, 401
 
+class DoctorLogin(Resource):
+    def post(self):
+        data = request.get_json()
+        doctor = Doctor.query.filter_by(email=data['email']).first()
+        if doctor and doctor.verify_password(data['password']):
+            session['doctor_id'] = doctor.id
+            return doctor.to_dict(), 200
+        return {'error': 'Invalid credentials'}, 401
+
 class Logout(Resource):
     def delete(self):
         session.pop('user_id', None)
+        session.pop('doctor_id', None)
         return {}, 204
 
 class CheckSession(Resource):
     def get(self):
         user_id = session.get('user_id')
+        doctor_id = session.get('doctor_id')
         if user_id:
             user = User.query.get(user_id)
             if user:
                 return user.to_dict(), 200
+        elif doctor_id:
+            doctor = Doctor.query.get(doctor_id)
+            if doctor:
+                return doctor.to_dict(), 200
         return {}, 204
 
 class ClearSession(Resource):
@@ -72,7 +76,7 @@ class ClearSession(Resource):
         session.clear()
         return {}, 204
 
-# Define other resources as needed
+# User Resource
 class UserResource(Resource):
     def get(self, user_id=None):
         if user_id:
@@ -83,14 +87,22 @@ class UserResource(Resource):
         users = User.query.all()
         return [user.to_dict() for user in users], 200
 
-# Register resources with the API
-api.add_resource(Signup, '/signup')
-api.add_resource(Login, '/login')
-api.add_resource(Logout, '/logout')
-api.add_resource(CheckSession, '/check_session')
-api.add_resource(ClearSession, '/clear')
-api.add_resource(UserResource, '/users', '/users/<int:user_id>')
+    def put(self, user_id):
+        data = request.get_json()
+        user = User.query.get(user_id)
+        if user:
+            user.name = data['name']
+            user.email = data['email']
+            user.age = data['age']
+            user.gender = data['gender']
+            user.phone_number = data['phone_number']
+            if 'password' in data:
+                user.password = data['password']
+            db.session.commit()
+            return user.to_dict(), 200
+        return {'error': 'User not found'}, 404
 
+# Doctor Resource
 class DoctorResource(Resource):
     def get(self, doctor_id=None):
         if doctor_id:
@@ -105,36 +117,17 @@ class DoctorResource(Resource):
         data = request.get_json()
         new_doctor = Doctor(
             name=data['name'],
+            email=data['email'],
             specialty=data['specialty'],
             experience_years=data['experience_years'],
             availability=data['availability']
         )
+        new_doctor.password = data['password']
         db.session.add(new_doctor)
         db.session.commit()
         return new_doctor.to_dict(), 201
 
-    def put(self, doctor_id):
-        data = request.get_json()
-        doctor = Doctor.query.get(doctor_id)
-        if doctor:
-            doctor.name = data['name']
-            doctor.specialty = data['specialty']
-            doctor.experience_years = data['experience_years']
-            doctor.availability = data['availability']
-            db.session.commit()
-            return doctor.to_dict(), 200
-        return {'error': 'Doctor not found'}, 404
-
-    def delete(self, doctor_id):
-        doctor = Doctor.query.get(doctor_id)
-        if doctor:
-            db.session.delete(doctor)
-            db.session.commit()
-            return {}, 204
-        return {'error': 'Doctor not found'}, 404
-
-api.add_resource(DoctorResource, '/doctors', '/doctors/<int:doctor_id>')
-
+# Appointment Resource
 class AppointmentResource(Resource):
     def get(self, appointment_id=None):
         if appointment_id:
@@ -148,13 +141,14 @@ class AppointmentResource(Resource):
     def post(self):
         try:
             data = request.get_json()
-            print(f"Received data: {data}")  # Debug log
+            date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            time_obj = datetime.strptime(data['time'], '%H:%M').time()
 
             new_appointment = Appointment(
                 user_id=data['user_id'],
                 doctor_id=data['doctor_id'],
-                date=datetime.strptime(data['date'], '%Y-%m-%d').date(),  # Parse date
-                time=datetime.strptime(data['time'], '%H:%M').time(),    # Parse time
+                date=date_obj,
+                time=time_obj,
                 status=data['status']
             )
 
@@ -172,8 +166,8 @@ class AppointmentResource(Resource):
             if appointment:
                 appointment.user_id = data['user_id']
                 appointment.doctor_id = data['doctor_id']
-                appointment.date = datetime.strptime(data['date'], '%Y-%m-%d').date()  # Parse date
-                appointment.time = datetime.strptime(data['time'], '%H:%M').time()    # Parse time
+                appointment.date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+                appointment.time = datetime.strptime(data['time'], '%H:%M').time()
                 appointment.status = data['status']
                 db.session.commit()
                 return appointment.to_dict(), 200
@@ -190,8 +184,7 @@ class AppointmentResource(Resource):
             return {}, 204
         return {'error': 'Appointment not found'}, 404
 
-api.add_resource(AppointmentResource, '/appointments', '/appointments/<int:appointment_id>')
-
+# Prescription Resource
 class PrescriptionResource(Resource):
     def get(self, prescription_id=None):
         if prescription_id:
@@ -234,6 +227,16 @@ class PrescriptionResource(Resource):
             return {}, 204
         return {'error': 'Prescription not found'}, 404
 
+# Register resources with the API
+api.add_resource(Signup, '/signup')
+api.add_resource(Login, '/login')
+api.add_resource(DoctorLogin, '/doctor_login')
+api.add_resource(Logout, '/logout')
+api.add_resource(CheckSession, '/check_session')
+api.add_resource(ClearSession, '/clear')
+api.add_resource(UserResource, '/users', '/users/<int:user_id>')
+api.add_resource(DoctorResource, '/doctors', '/doctors/<int:doctor_id>')
+api.add_resource(AppointmentResource, '/appointments', '/appointments/<int:appointment_id>', '/appointments/user/<int:user_id>', '/appointments/doctor/<int:doctor_id>')
 api.add_resource(PrescriptionResource, '/prescriptions', '/prescriptions/<int:prescription_id>')
 
 if __name__ == '__main__':

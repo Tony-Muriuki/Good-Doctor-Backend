@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Standard library imports
+
 from datetime import datetime
 
 # Local imports
@@ -35,19 +35,24 @@ with app.app_context():
     )
     user2.password = 'password2'
 
-    # Create some doctors
+    # Create some doctors with dummy passwords
     doctor1 = Doctor(
         name='Dr. Smith',
+        email='dr.smith@example.com',
         specialty='Cardiology',
         experience_years=15,
         availability='Available'
     )
+    doctor1.password = 'password3'
+
     doctor2 = Doctor(
         name='Dr. Johnson',
+        email='dr.johnson@example.com',
         specialty='Neurology',
         experience_years=20,
         availability='Unavailable'
     )
+    doctor2.password = 'password4'
 
     # Create some appointments
     appointment1 = Appointment(

@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: afacb6844db2
+Revision ID: b43b96f5728a
 Revises: 
-Create Date: 2024-07-11 23:58:27.500948
+Create Date: 2024-07-15 23:30:36.694793
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'afacb6844db2'
+revision = 'b43b96f5728a'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,10 +21,13 @@ def upgrade():
     op.create_table('doctors',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('password_hash', sa.String(), nullable=False),
     sa.Column('specialty', sa.String(), nullable=False),
     sa.Column('experience_years', sa.Integer(), nullable=False),
     sa.Column('availability', sa.String(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('email')
     )
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -44,8 +47,8 @@ def upgrade():
     sa.Column('date', sa.Date(), nullable=False),
     sa.Column('time', sa.Time(), nullable=False),
     sa.Column('status', sa.String(), nullable=False),
-    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], name=op.f('fk_appointments_doctor_id_doctors')),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_appointments_user_id_users')),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], name='fk_appointments_doctor_id'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name='fk_appointments_user_id'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('prescriptions',
@@ -54,7 +57,7 @@ def upgrade():
     sa.Column('medicine', sa.String(), nullable=False),
     sa.Column('dosage', sa.String(), nullable=False),
     sa.Column('instructions', sa.String(), nullable=False),
-    sa.ForeignKeyConstraint(['appointment_id'], ['appointments.id'], name=op.f('fk_prescriptions_appointment_id_appointments')),
+    sa.ForeignKeyConstraint(['appointment_id'], ['appointments.id'], name='fk_prescriptions_appointment_id'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
